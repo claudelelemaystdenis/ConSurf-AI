@@ -1,4 +1,6 @@
-"""Output files: per-residue CSV, structure with grades as B-factors, PyMOL / ChimeraX colouring scripts."""
+"""Output files shared by both modes: tab-separated tables + README.txt, and for structures the structure file
+with grades as B-factors and PyMOL / ChimeraX colouring scripts (the same files as the Colab notebooks)."""
+import datetime
 import os
 
 import numpy as np
@@ -10,19 +12,67 @@ CONSURF_COLORS = {1: "#10C8D1", 2: "#8CFFFF", 3: "#D7FFFF", 4: "#EAFFFF", 5: "#F
                   6: "#FCEDF4", 7: "#FAC9DE", 8: "#F07DAB", 9: "#A02560"}
 LOWCONF_COLOR = "#FFFF96"
 
-CSV_HEADER = ("# GRADE: 1 = most variable ... 9 = most conserved. UNCERTAINTY_RAW: predicted uncertainty "
-              "(0-8, lower = better); UNCERTAINTY: rounded value; CONFIDENT = UNCERTAINTY < 2. "
-              "P_GRADE_k: predicted probability of grade k.\n")
+# Description of every column, written to README.txt next to the tables (the tables have no comment lines,
+# so they open cleanly in Excel, R and pandas).
+COLUMN_HELP = {
+    "SEQ_ID": "sequence identifier (first word of the FASTA header, made unique)",
+    "POS": "position in the sequence (1 = first residue)",
+    "CHAIN": "chain ID in the structure file",
+    "RESIDUE_NUMBER": "residue number in the structure file (with insertion code, if any)",
+    "RESNAME": "residue name (three-letter code)",
+    "AA": "amino acid (one-letter code)",
+    "GRADE": "ConSurf-AI conservation grade: 1 = most variable ... 9 = most conserved",
+    "UNCERTAINTY_RAW": "predicted uncertainty of the grade, 0-8 (lower = better)",
+    "UNCERTAINTY": "UNCERTAINTY_RAW rounded to the nearest integer",
+    "CONFIDENT": "True if UNCERTAINTY < 2; False = uncertain prediction (same role as ConSurf's "
+                 "'insufficient data' flag)",
+    "P_GRADE_1 ... P_GRADE_9": "predicted probability of each grade (they sum to 1)",
+    "DESCRIPTION": "full FASTA header (or the name given with --name)",
+    "LENGTH": "number of residues after cleaning",
+    "STATUS": "ok, skipped (empty or longer than 2000 residues) or error",
+    "NOTE": "changes made to the sequence (removed gaps/stops, unknown letters read as X)",
+    "N_UNCERTAIN": "number of residues with an uncertain prediction (CONFIDENT = False)",
+    "FRACTION_UNCERTAIN": "N_UNCERTAIN / LENGTH",
+    "MEAN_GRADE": "mean grade over the sequence",
+    "N_GRADE_1 ... N_GRADE_9": "number of residues with each grade",
+    "SEQUENCE": "the sequence as used for the prediction",
+}
 
 
-def grades_table(pred, aa, chain="", residue_numbers=None, resnames=None):
-    n = len(aa)
+def write_readme(out_dir, title, input_desc, files, column_sets):
+    """files: [(name, description)]; column_sets: [(table name, [columns])]."""
+    from . import __version__
+    w = max(len(n) for n, _ in files) + 2
+    out = [title, "=" * len(title), "",
+           f"Input:  {input_desc}",
+           f"Date:   {datetime.datetime.now(datetime.timezone.utc):%Y-%m-%d %H:%M} UTC",
+           f"Model:  ConSurf-AI {__version__} (attention network on ESM2-3B embeddings)", "",
+           "Files", "-----"]
+    out += [f"{n:<{w}}{d}" for n, d in files]
+    for table, cols in column_sets:
+        out += ["", f"Columns of {table}", "-" * (11 + len(table))]
+        shown = [c for c in cols if not c.startswith("P_GRADE_")]
+        if any(c.startswith("P_GRADE_") for c in cols):
+            shown.append("P_GRADE_1 ... P_GRADE_9")
+        cw = max(len(c) for c in shown) + 2
+        out += [f"{c:<{cw}}{COLUMN_HELP.get(c, '')}" for c in shown]
+    out += ["", "Tables are tab-separated (.tsv). Excel: File > Open (or drag the file onto Excel). "
+                "R: read.delim(file). Python: pandas.read_csv(file, sep='\\t')."]
+    path = os.path.join(out_dir, "README.txt")
+    with open(path, "w") as f:
+        f.write("\n".join(out) + "\n")
+    return path
+
+
+# ── Structure mode ───────────────────────────────────────────────────────────
+def grades_table(pred, residues, chain):
+    """Per-residue table for a structure chain (residues: list of dicts from structure.chain_residues)."""
     df = pd.DataFrame({
-        "POS": np.arange(1, n + 1),
+        "POS": np.arange(1, len(residues) + 1),
         "CHAIN": chain,
-        "RESIDUE_NUMBER": residue_numbers if residue_numbers is not None else [str(i) for i in range(1, n + 1)],
-        "RESNAME": resnames if resnames is not None else [""] * n,
-        "AA": list(aa),
+        "RESIDUE_NUMBER": [r["key"] for r in residues],
+        "RESNAME": [r["resname"] for r in residues],
+        "AA": [r["aa"] for r in residues],
         "GRADE": pred["grades"].astype(int),
         "UNCERTAINTY_RAW": np.round(pred["uncertainty"], 3),
         "UNCERTAINTY": pred["uncertainty_rounded"].astype(int),
@@ -31,12 +81,6 @@ def grades_table(pred, aa, chain="", residue_numbers=None, resnames=None):
     for g in range(9):
         df[f"P_GRADE_{g + 1}"] = np.round(pred["probs"][:, g], 4)
     return df
-
-
-def write_csv(df, path, title):
-    with open(path, "w") as f:
-        f.write(f"# ConSurf-AI predictions for {title}\n" + CSV_HEADER)
-        df.to_csv(f, index=False)
 
 
 def _rgb01(hex_color):
@@ -81,11 +125,15 @@ def chimerax_script(df, chain, structure_file):
     return "\n".join(lines) + "\n"
 
 
-def write_structure_outputs(df, inputs, st, chain, out_dir, base):
-    """Writes the structure file(s) with grades as B-factors and the PyMOL / ChimeraX scripts.
-    `inputs` = {"cif": path, "pdb": path} (original files). Returns the list of written paths."""
+def write_structure_outputs(df, inputs, st, chain, out_dir, base, source):
+    """Writes <base>_grades.tsv, the structure file(s) with grades as B-factors, PyMOL / ChimeraX scripts and
+    README.txt. `inputs` = {"cif": path, "pdb": path} (original files). Returns the list of written paths."""
+    os.makedirs(out_dir, exist_ok=True)
+    tsv = os.path.join(out_dir, f"{base}_grades.tsv")
+    df.to_csv(tsv, sep="\t", index=False)
+    written = [tsv]
     values = dict(zip(df.RESIDUE_NUMBER, df.GRADE.astype(int)))
-    written, struct_name = [], None
+    struct_name = None
     if "cif" in inputs:
         p = os.path.join(out_dir, f"{base}_structure.cif")
         cif_with_bfactors(inputs["cif"], p, chain, values, query_subchains(st, chain))
@@ -101,4 +149,12 @@ def write_structure_outputs(df, inputs, st, chain, out_dir, base):
         with open(p, "w") as f:
             f.write(fn(df, chain, struct_name))
         written.append(p)
+    desc = {".tsv": "per-residue grades and uncertainties (one row per residue)",
+            ".cif": f"input structure file; B-factor column = grade on chain {chain} (0 elsewhere)",
+            ".pdb": f"input structure file (PDB format); B-factor column = grade on chain {chain} (0 elsewhere)",
+            ".pml": "PyMOL script: ConSurf colouring (run next to the structure file)",
+            ".cxc": "ChimeraX script: ConSurf colouring (open next to the structure file)"}
+    written.append(write_readme(out_dir, "ConSurf-AI results", f"{source}, chain {chain}",
+                                [(os.path.basename(p), desc[os.path.splitext(p)[1]]) for p in written],
+                                [(os.path.basename(tsv), list(df.columns))]))
     return written

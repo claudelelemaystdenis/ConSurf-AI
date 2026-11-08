@@ -8,3 +8,4 @@ dist/
 consurf_ai_results/
 consurf_ai_run/
 *.part
+tests/output/

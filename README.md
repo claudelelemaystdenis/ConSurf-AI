@@ -5,14 +5,15 @@ ConSurf-AI predicts **per-residue evolutionary conservation grades** on the ConS
 multiple sequence alignment**. It runs a small attention network on ESM2-3B embeddings, and it also predicts
 an uncertainty for each residue (the equivalent of ConSurf's "insufficient data" flag).
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/claudelelemaystdenis/ConSurf-AI/blob/main/colab/ConSurf_AI.ipynb)
+## Ways to run it
 
-## Two ways to run it
+| | Input → output | |
+|---|---|---|
+| **Colab: structure** | One structure (PDB ID, UniProt accession → AlphaFold DB model, or your own file) → grades mapped on the 3D structure, PyMOL / ChimeraX scripts | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/claudelelemaystdenis/ConSurf-AI/blob/main/colab/ConSurf_AI.ipynb) |
+| **Colab: sequences** | One sequence or a FASTA file with many sequences → tables of grades | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/claudelelemaystdenis/ConSurf-AI/blob/main/colab/ConSurf_AI_sequences.ipynb) |
+| **Locally** (below) | Both, from the command line or Python: many proteins, whole proteomes, pipelines, or data that must stay on your machine | |
 
-| | When to use it |
-|---|---|
-| **Google Colab** (badge above) | No installation. One structure at a time, with an interactive 3D view. A free T4 GPU is enough. |
-| **Locally** (below) | Many proteins, whole proteomes, pipelines, or data that must stay on your machine. |
+The Colab notebooks need no installation; a free T4 GPU is enough.
 
 ## Local installation
 
@@ -38,14 +39,20 @@ about a minute per protein, depending on the machine). On NVIDIA GPUs with less 
 ## Usage
 
 ```bash
+# Sequences -> tables (the same files as the sequence notebook)
+consurf-ai proteins.fasta                                   # one or many sequences
+consurf-ai --sequence MVLSPADKTNVKAAWGKVGAH --name my_protein  # a single sequence
+
+# Structure -> grades mapped on the structure (the same files as the structure notebook)
 consurf-ai 4HHB --chain A                # PDB ID, fetched from RCSB
 consurf-ai P69905                        # UniProt accession, AlphaFold DB model
 consurf-ai my_model.cif --chain all      # local PDB / mmCIF file (.gz accepted)
-consurf-ai proteins.fasta                # sequences only: one CSV per sequence
+
 consurf-ai --help
 ```
 
-Results go to `consurf_ai_results/` (change it with `-o`).
+Results go to a folder in `consurf_ai_results/` (change it with `-o`): `<name>/` for sequences (named after
+the FASTA file or `--name`), `<structure>_<chain>/` for each structure chain.
 
 From Python:
 
@@ -59,22 +66,52 @@ pred["grades"], pred["uncertainty"], pred["confident"]
 
 ## Output files
 
+Tables are tab-separated (`.tsv`): open them in Excel with File → Open, in R with `read.delim()`, in Python with
+`pandas.read_csv(file, sep="\t")`. Every results folder has a `README.txt` describing the run and every column.
+
+**Sequences** (`consurf_ai_results/<name>/`)
+
 | File | Content |
 |---|---|
-| `*_grades.csv` | One row per residue: numbering, amino acid, **grade (1–9)**, **uncertainty** (raw 0–8 and rounded; lower = better), confidence flag (rounded uncertainty < 2), probability of each grade |
+| `*_summary.tsv` | One row per input sequence: ID, FASTA header, length, status (ok / skipped / error), changes made to the sequence, number and fraction of uncertain residues, mean grade, number of residues in each grade, sequence |
+| `*_all_residues.tsv` | **All predictions together**, one row per residue of every sequence: sequence ID, position, amino acid, **grade (1–9)**, **uncertainty** (raw 0–8 and rounded; lower = better), confidence flag (rounded uncertainty < 2), probability of each grade |
+| `*_grade_strings.fasta` | For each sequence: the sequence, its grades and its rounded uncertainties as three aligned FASTA records |
+| `per_sequence/*_grades.tsv` | The per-residue table, one file per sequence |
+
+**Structures** (`consurf_ai_results/<structure>_<chain>/`)
+
+| File | Content |
+|---|---|
+| `*_grades.tsv` | One row per residue: chain numbering, amino acid, grade, uncertainty, confidence flag, probability of each grade |
 | `*_structure.pdb` / `.cif` | The input structure file, unchanged except for the **B-factor** column, which holds the grade on the query chain (0 elsewhere) |
 | `*_pymol.pml` / `*_chimerax.cxc` | Scripts that colour the structure with the ConSurf colours (open them next to the structure file) |
 
 Predictions use the residues present in the structure (first model, first alternate conformation); missing
-residues are not filled in from SEQRES. Chains of up to 2000 residues are supported.
+residues are not filled in from SEQRES. Sequences and chains of up to 2000 residues are supported.
+
+## Checking your installation
+
+```bash
+python tests/run_tests.py            # add --device cpu to force the CPU
+```
+
+This runs ConSurf-AI on two inputs in [`tests/input/`](tests/input/) and compares the results with the expected
+outputs in [`tests/expected/`](tests/expected/), which were produced on an NVIDIA A100 GPU (ESM2 in float32):
+
+1. **structure path:** `4HHB.cif` (human haemoglobin, chain A);
+2. **sequence path:** `dihydrofolate_reductases.fasta` (5 dihydrofolate reductases).
+
+It reports, for each path, whether the grades are identical (and lists the residues whose grade differs) and how
+much the uncertainties and probabilities differ. Small numerical differences between machines are normal (CPU vs
+GPU: at most 0.001 in our tests) and are accepted up to 0.01.
 
 ## Repository layout
 
 ```
-consurf_ai/        Python package (model, ESM2 embedding, structure I/O, output files, command line)
-weights/           ConSurf-AI network weights + SHA256 checksum
-colab/             Google Colab notebook
-tests/             Quick CPU tests (no ESM2 download):  pytest tests
+consurf_ai/        Python package (model, ESM2 embedding, structure and sequence I/O, output files, command line)
+weights/           ConSurf-AI network weights + SHA256SUMS (checksum: sha256sum -c SHA256SUMS)
+colab/             Google Colab notebooks (structure, sequences)
+tests/             Reference test: input/, expected/ and run_tests.py
 ```
 
 ## Citation
