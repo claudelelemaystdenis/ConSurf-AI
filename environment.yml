@@ -1,0 +1,17 @@
+name: consurf-ai
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pytorch>=2.1
+  - pytorch-cuda=12.1   # remove this line on machines without an NVIDIA GPU (or on macOS)
+  - transformers>=4.30
+  - accelerate
+  - gemmi>=0.6
+  - numpy
+  - pandas
+  - pip
+  - pip:
+      - -e .

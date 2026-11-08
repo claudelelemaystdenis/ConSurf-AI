@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "consurf-ai"
+version = "1.0.0"
+description = "Per-residue evolutionary conservation grades (ConSurf scale 1-9) without a multiple sequence alignment"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.9"
+dependencies = [
+    "torch>=2.1",          # LayerNorm(bias=...) needs 2.1
+    "transformers>=4.30",
+    "accelerate",          # lower peak RAM when loading ESM2-3B
+    "gemmi>=0.6",
+    "numpy",
+    "pandas",
+]
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[project.scripts]
+consurf-ai = "consurf_ai.cli:main"
+
+[tool.setuptools]
+packages = ["consurf_ai"]
