@@ -8,12 +8,10 @@ an uncertainty for each residue (the equivalent of ConSurf's "insufficient data"
 ## Ways to run it
 
 **Colab: structure.** One structure (PDB ID, UniProt accession → AlphaFold DB model, or your own file) →
-grades mapped on the 3D structure, PyMOL / ChimeraX scripts.
-
+grades mapped on the 3D structure, PyMOL / ChimeraX scripts.<br>
 <a href="https://colab.research.google.com/github/claudelelemaystdenis/ConSurf-AI/blob/main/colab/ConSurf_AI.ipynb"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open the structure notebook in Colab" height="48"></a>
 
-**Colab: sequences.** One sequence or a FASTA file with many sequences → tables of grades.
-
+**Colab: sequences.** One sequence or a FASTA file with many sequences → tables of grades.<br>
 <a href="https://colab.research.google.com/github/claudelelemaystdenis/ConSurf-AI/blob/main/colab/ConSurf_AI_sequences.ipynb"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open the sequence notebook in Colab" height="48"></a>
 
 The Colab notebooks need no installation; a free T4 GPU is enough.
