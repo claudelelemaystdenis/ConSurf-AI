@@ -1,17 +1,12 @@
 name: consurf-ai
+# Works on Linux, macOS and Windows. PyTorch is installed by pip (through `-e .` below), which picks the
+# right build: with CUDA on Linux, with Apple-GPU (MPS) support on Apple-silicon Macs, CPU-only elsewhere.
+# Windows with an NVIDIA GPU: after creating the environment, install the CUDA build of PyTorch with the
+# command given at https://pytorch.org/get-started/locally/ (pip, CUDA).
 channels:
-  - pytorch
-  - nvidia
   - conda-forge
 dependencies:
   - python=3.11
-  - pytorch>=2.1
-  - pytorch-cuda=12.1   # remove this line on machines without an NVIDIA GPU (or on macOS)
-  - transformers>=4.30
-  - accelerate
-  - gemmi>=0.6
-  - numpy
-  - pandas
   - pip
   - pip:
       - -e .

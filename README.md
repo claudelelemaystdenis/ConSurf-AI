@@ -19,15 +19,21 @@ an uncertainty for each residue (the equivalent of ConSurf's "insufficient data"
 ```bash
 git clone https://github.com/claudelelemaystdenis/ConSurf-AI.git
 cd ConSurf-AI
-conda env create -f environment.yml      # or: pip install -e .   (into an environment with PyTorch)
+conda env create -f environment.yml      # or, without conda: pip install -e .   (Python ≥ 3.9)
 conda activate consurf-ai
 ```
 
 The ConSurf-AI weights (21 MB) are included in [`weights/`](weights/). The first run also downloads
 ESM2-3B (~11 GB) from Hugging Face into `~/.cache/huggingface`.
 
-**Hardware.** A GPU with ≥ 8 GB of memory is recommended (ESM2 runs in fp16 on GPUs with < 14 GB). CPU-only
-also works: it needs ~12 GB of RAM and takes about a minute for a 150-residue chain.
+**Hardware.** The GPU is used automatically when there is one:
+- **Linux with an NVIDIA GPU:** works out of the box (pip installs PyTorch with CUDA).
+- **Mac with Apple silicon (M1–M4):** uses the Mac's GPU (MPS). At least 16 GB of memory is recommended.
+- **Windows with an NVIDIA GPU:** after creating the environment, install the CUDA build of PyTorch with the
+  pip command from [pytorch.org](https://pytorch.org/get-started/locally/).
+
+Without a GPU, ConSurf-AI runs on the CPU. It needs ~12 GB of RAM and is much slower (from several seconds to
+about a minute per protein, depending on the machine). On NVIDIA GPUs with less than 14 GB of memory, ESM2 runs in fp16.
 
 ## Usage
 
