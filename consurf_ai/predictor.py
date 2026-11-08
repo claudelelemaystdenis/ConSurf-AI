@@ -8,6 +8,12 @@ import torch.nn.functional as F
 
 from .model import MAX_LEN, load_network
 
+# Hugging Face's official safetensors conversion of facebook/esm2_t36_3B_UR50D (same weights as the main branch,
+# which only has .bin files; checked to give identical embeddings). Needed with PyTorch < 2.6, because recent
+# transformers versions refuse to read .bin checkpoints with older PyTorch (CVE-2025-32434). Intel Macs are
+# limited to PyTorch 2.2.
+ESM2_3B_SAFETENSORS_REVISION = "6c3c8884b1ac09c09c27990edfe8d3680216e4f2"
+
 
 def default_device():
     if torch.cuda.is_available():
@@ -43,6 +49,9 @@ class ConSurfAI:
                   "the first run downloads ~11 GB from Hugging Face...")
         tv = tuple(int(x) for x in re.findall(r"\d+", transformers.__version__)[:2])
         kw = {"add_pooling_layer": False, ("dtype" if tv >= (4, 56) else "torch_dtype"): esm_dtype}
+        torch_v = tuple(int(x) for x in re.findall(r"\d+", torch.__version__)[:2])
+        if torch_v < (2, 6) and self.esm_name == "facebook/esm2_t36_3B_UR50D":
+            kw.update(revision=ESM2_3B_SAFETENSORS_REVISION, use_safetensors=True)
         if tv < (5, 0):
             try:
                 import accelerate  # noqa: F401  (needed for low_cpu_mem_usage: avoids holding two copies in RAM)

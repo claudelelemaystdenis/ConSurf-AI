@@ -16,6 +16,11 @@ dependencies = [
     "gemmi>=0.6",
     "numpy",
     "pandas",
+    # Intel Macs: PyTorch stops at 2.2.2 there, recent transformers need a newer PyTorch,
+    # PyTorch 2.2.2 does not work with NumPy 2, and pandas 3 requires NumPy 2.
+    "transformers<5; sys_platform == 'darwin' and platform_machine == 'x86_64'",
+    "numpy<2; sys_platform == 'darwin' and platform_machine == 'x86_64'",
+    "pandas<3; sys_platform == 'darwin' and platform_machine == 'x86_64'",
 ]
 
 [project.optional-dependencies]
