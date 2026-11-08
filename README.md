@@ -75,7 +75,7 @@ tests/             Quick CPU tests (no ESM2 download):  pytest tests
 
 If you use ConSurf-AI, please cite:
 
-# TO CHANGE
+TO CHANGE
 > <Authors>. <Paper title>. *<Journal>* (2026). https://doi.org/<DOI>
 
 ```bibtex
